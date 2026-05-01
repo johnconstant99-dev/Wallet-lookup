@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>⛓️ CHAIN • Ethereum Explorer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.2/ethers.umd.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    .title { font-family: 'Space Grotesk', sans-serif; }
+    .grid-bg {
+      background-image: 
+        linear-gradient(0deg, transparent 24%, rgba(34, 211, 238, 0.08) 25%, rgba(34, 211, 238, 0.08) 26%, transparent 27%, transparent 74%, rgba(34, 211, 238, 0.08) 75%, rgba(34, 211, 238, 0.08) 76%, transparent 77%, transparent),
+        linear-gradient(90deg, transparent 24%, rgba(34, 211, 238, 0.08) 25%, rgba(34, 211, 238, 0.08) 26%, transparent 27%, transparent 74%, rgba(34, 211, 238, 0.08) 75%, rgba(34, 211, 238, 0.08) 76%, transparent 77%, transparent);
+      background-size: 60px 60px;
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-950 text-white overflow-hidden">
+  <div class="fixed inset-0 grid-bg opacity-40 pointer-events-none"></div>
+
+  <div class="relative z-10 max-w-7xl mx-auto px-6 py-8">
+    <!-- Header -->
+    <header class="flex justify-between items-center border-b border-cyan-900/30 pb-6">
+      <div>
+        <h1 class="title text-5xl font-bold tracking-tighter bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
+          ⛓️ CHAIN
+        </h1>
+        <p class="text-cyan-400/70 text-sm">Holesky Testnet Explorer</p>
+      </div>
+      <div id="block-info" class="text-right text-sm text-cyan-400/70"></div>
+    </header>
+
+    <!-- Input -->
+    <div class="mt-12 mb-10">
+      <div class="flex flex-col md:flex-row gap-4 max-w-2xl">
+        <input id="address-input" type="text" placeholder="0x1234... or connect wallet" 
+               class="flex-1 bg-slate-900 border border-cyan-900/50 focus:border-cyan-400 rounded-2xl px-6 py-4 text-lg font-mono outline-none transition-all">
+        <button onclick="exploreAddress()" 
+                class="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 px-10 py-4 rounded-2xl font-semibold text-slate-950 transition-all active:scale-95">
+          EXPLORE
+        </button>
+        <button onclick="connectWallet()" 
+                class="bg-slate-800 hover:bg-slate-700 border border-cyan-400/30 px-6 py-4 rounded-2xl font-medium transition-all flex items-center gap-2">
+          <span>🔗</span> Wallet
+        </button>
+      </div>
+      <p id="error-msg" class="mt-3 text-red-400 text-sm hidden"></p>
+    </div>
+
+    <div id="dashboard" class="hidden">
+      <!-- Address -->
+      <div class="bg-gradient-to-br from-slate-900 to-slate-800/70 border border-cyan-900/30 rounded-3xl p-8 mb-8">
+        <p class="uppercase text-xs tracking-widest text-cyan-400/60 mb-2">Connected Address</p>
+        <p id="display-address" class="font-mono text-xl break-all"></p>
+      </div>
+
+      <!-- Stats Grid -->
+      <div class="grid md:grid-cols-3 gap-6 mb-12">
+        <!-- ETH Balance -->
+        <div class="bg-gradient-to-br from-slate-900/80 to-transparent border border-cyan-900/30 rounded-3xl p-8 hover:border-cyan-400/50 transition-all">
+          <p class="text-cyan-400/60 text-xs uppercase tracking-widest mb-3">ETH Balance</p>
+          <p id="eth-balance" class="text-5xl font-bold text-white">0.000000</p>
+          <p class="text-cyan-400/50 text-sm">Holesky Testnet</p>
+        </div>
+
+        <!-- Gas -->
+        <div class="bg-gradient-to-br from-slate-900/80 to-transparent border border-cyan-900/30 rounded-3xl p-8 hover:border-cyan-400/50 transition-all">
+          <p class="text-cyan-400/60 text-xs uppercase tracking-widest mb-3">Gas Price</p>
+          <div id="gas-info" class="space-y-4 text-lg"></div>
+        </div>
+
+        <!-- Network -->
+        <div class="bg-gradient-to-br from-slate-900/80 to-transparent border border-cyan-900/30 rounded-3xl p-8 hover:border-cyan-400/50 transition-all">
+          <p class="text-cyan-400/60 text-xs uppercase tracking-widest mb-3">Network</p>
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+            <span class="font-semibold">Ethereum Holesky</span>
+          </div>
+          <p class="text-sm text-cyan-400/70">Live • Public RPC</p>
+        </div>
+      </div>
+
+      <!-- Tokens Section -->
+      <div class="mb-12">
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="text-2xl font-semibold flex items-center gap-3">
+            <span class="w-2 h-8 bg-gradient-to-t from-cyan-400 to-transparent rounded"></span>
+            Token Balances
+          </h2>
+          <button onclick="addCustomToken()" 
+                  class="text-sm px-5 py-2 bg-slate-800 hover:bg-slate-700 border border-cyan-400/30 rounded-xl flex items-center gap-2 transition-all">
+            <span>+</span> Add Custom Token
+          </button>
+        </div>
+        
+        <div id="token-list" class="grid md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+      </div>
+
+      <!-- Transactions -->
+      <div class="bg-gradient-to-br from-slate-900/80 to-transparent border border-cyan-900/30 rounded-3xl p-8">
+        <h2 class="text-2xl font-semibold mb-6 flex items-center gap-3">
+          <span class="w-2 h-8 bg-gradient-to-t from-cyan-400 to-transparent rounded"></span>
+          Recent Transactions
+        </h2>
+        <div id="tx-list" class="space-y-4"></div>
+      </div>
+    </div>
+
+    <!-- Empty State -->
+    <div id="empty-state" class="text-center py-32">
+      <div class="text-8xl mb-8 opacity-30">⛓️</div>
+      <h2 class="text-4xl font-semibold mb-4">Welcome to the Chain</h2>
+      <p class="text-cyan-400/60 max-w-md mx-auto">Enter any Holesky address or connect your wallet to explore balances and transactions.</p>
+    </div>
+  </div>
+
+  <script>
+    let provider;
+    const RPC_URL = "https://17000.rpc.thirdweb.com";
+
+    // Preloaded popular Holesky test tokens (add more as needed)
+    let tokens = [
+      { symbol: "USDC", address: "0x9715b2786f1053294fc8952df923b95cab9aac42", decimals: 6 },
+      { symbol: "USDT", address: "0x86f6c353a0965eb069cd7f4f91c1afef8c725551", decimals: 6 },
+      { symbol: "DAI", address: "0x4e35f8a6a5b0c8d8e6d9b8f7e5d6c7b8a9f0e1d2", decimals: 18 }, // replace with real if available
+    ];
+
+    async function initProvider() {
+      provider = new ethers.JsonRpcProvider(RPC_URL);
+    }
+
+    async function getBlockNumber() {
+      try {
+        const block = await provider.getBlockNumber();
+        document.getElementById('block-info').innerHTML = `Block <span class="font-mono">#${block.toLocaleString()}</span>`;
+      } catch(e) {}
+    }
+
+    async function getTokenBalance(address, token) {
+      try {
+        const erc20Abi = [
+          "function balanceOf(address) view returns (uint256)",
+          "function decimals() view returns (uint8)",
+          "function symbol() view returns (string)"
+        ];
+        const contract = new ethers.Contract(token.address, erc20Abi, provider);
+        const balance = await contract.balanceOf(address);
+        const decimals = token.decimals || await contract.decimals();
+        return parseFloat(ethers.formatUnits(balance, decimals)).toFixed(4);
+      } catch (e) {
+        return "0";
+      }
+    }
+
+    async function renderTokenBalances(walletAddress) {
+      const container = document.getElementById('token-list');
+      container.innerHTML = '';
+
+      for (const token of tokens) {
+        const balance = await getTokenBalance(walletAddress, token);
+        
+        const div = document.createElement('div');
+        div.className = "bg-gradient-to-br from-slate-900/80 to-transparent border border-cyan-900/30 rounded-3xl p-6 hover:border-cyan-400/50 transition-all group";
+        div.innerHTML = `
+          <div class="flex justify-between items-start">
+            <div>
+              <div class="text-cyan-400/70 text-sm">${token.symbol}</div>
+              <div class="text-3xl font-bold text-white mt-1">${balance}</div>
+            </div>
+            <div class="text-xs bg-slate-800 px-3 py-1 rounded-full text-cyan-400/70 group-hover:text-cyan-300 transition-colors">
+              ERC-20
+            </div>
+          </div>
+        `;
+        container.appendChild(div);
+      }
+    }
+
+    async function addCustomToken() {
+      const contractAddr = prompt("Enter ERC-20 Token Contract Address (Holesky):");
+      if (!contractAddr || !ethers.isAddress(contractAddr)) {
+        alert("Invalid address");
+        return;
+      }
+      const symbol = prompt("Token Symbol (e.g. TEST):", "CUSTOM") || "CUSTOM";
+      tokens.push({ symbol, address: contractAddr, decimals: 18 });
+      // Refresh if dashboard is open
+      const addr = document.getElementById('display-address').textContent;
+      if (addr) exploreAddress(addr);
+    }
+
+    async function fetchTransactions(address) {
+      const url = `https://api-holesky.etherscan.io/api?module=account&action=txlist&address=${address}&sort=desc&apikey=`;
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        return data.status === "1" ? data.result.slice(0, 5) : [];
+      } catch(e) {
+        return [];
+      }
+    }
+
+    async function exploreAddress(addr = null) {
+      const input = document.getElementById('address-input');
+      const address = addr || input.value.trim();
+      
+      if (!address || !ethers.isAddress(address)) {
+        showError("Invalid Ethereum address");
+        return;
+      }
+
+      document.getElementById('error-msg').classList.add('hidden');
+      document.getElementById('dashboard').classList.remove('hidden');
+      document.getElementById('empty-state').classList.add('hidden');
+
+      document.getElementById('display-address').textContent = address;
+
+      try {
+        // ETH Balance
+        const balance = await provider.getBalance(address);
+        document.getElementById('eth-balance').textContent = parseFloat(ethers.formatEther(balance)).toFixed(6);
+
+        // Gas
+        const feeData = await provider.getFeeData();
+        const gasHtml = `<div class="text-2xl font-bold">${parseFloat(ethers.formatUnits(feeData.gasPrice || feeData.maxFeePerGas || 0n, 'gwei')).toFixed(1)} <span class="text-sm text-cyan-400/70">Gwei</span></div>`;
+        document.getElementById('gas-info').innerHTML = gasHtml;
+
+        // Tokens
+        await renderTokenBalances(address);
+
+        // Transactions
+        const txs = await fetchTransactions(address);
+        const txContainer = document.getElementById('tx-list');
+        txContainer.innerHTML = txs.length ? '' : '<p class="text-cyan-400/50 italic">No recent transactions.</p>';
+
+        txs.forEach(tx => {
+          const div = document.createElement('div');
+          div.className = "flex items-center justify-between bg-slate-900/70 border border-cyan-900/30 rounded-2xl p-5 hover:border-cyan-400/50 transition-all group";
+          div.innerHTML = `
+            <div class="flex-1 min-w-0">
+              <a href="https://holesky.etherscan.io/tx/${tx.hash}" target="_blank" class="font-mono text-xs text-cyan-400 group-hover:text-white transition-colors block truncate">${tx.hash}</a>
+              <div class="text-xs text-cyan-400/60 mt-1">${new Date(tx.timeStamp * 1000).toLocaleString()}</div>
+            </div>
+            <div class="text-right">
+              <div class="text-lg font-semibold">${parseFloat(ethers.formatEther(tx.value)).toFixed(4)} ETH</div>
+              <div class="text-xs ${tx.isError === '0' ? 'text-green-400' : 'text-red-400'}">${tx.isError === '0' ? '✓ Success' : '✗ Failed'}</div>
+            </div>
+          `;
+          txContainer.appendChild(div);
+        });
+
+      } catch (err) {
+        showError("Failed to fetch data: " + err.message);
+      }
+    }
+
+    async function connectWallet() {
+      if (!window.ethereum) {
+        alert("MetaMask not detected. Please install it.");
+        return;
+      }
+      try {
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        const address = accounts[0];
+        document.getElementById('address-input').value = address;
+        exploreAddress(address);
+      } catch (e) {
+        showError("Wallet connection cancelled");
+      }
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('error-msg');
+      el.textContent = msg;
+      el.classList.remove('hidden');
+    }
+
+    // Initialize
+    window.onload = () => {
+      initProvider();
+      setInterval(getBlockNumber, 10000);
+      getBlockNumber();
+    };
+  </script>
+</body>
+</html>
